@@ -1,4 +1,9 @@
 (async function init() {
+  // Delay keeps feedback visible briefly before automatically loading the next word.
+  const NEXT_QUESTION_DELAY_MS = 650;
+  // Matches OCR-fragmented tokens broken into many short chunks (e.g., "de vi a tion").
+  // 1-3 char chunks repeated 3+ times followed by a final 1-8 char chunk.
+  const OCR_SPLIT_WORD_PATTERN = /\b([a-z]{1,3}(?:\s+[a-z]{1,3}){2,}\s+[a-z]{1,8})\b/gi;
   const data = await fetch('./words-data.json').then((r) => r.json());
 
   const partEl = document.getElementById('partSelection');
@@ -10,7 +15,8 @@
     String(text)
       .replace(/\u00ad/g, '')
       .replace(/ﬁ/g, 'fi')
-      .replace(/\b([a-z]{1,3}(?:\s+[a-z]{1,3}){2,}\s+[a-z]{1,8})\b/gi, (m) => m.replace(/\s+/g, ''))
+      // Re-join OCR splits where one word was broken into many short chunks (e.g., "de vi a tion").
+      .replace(OCR_SPLIT_WORD_PATTERN, (m) => m.replace(/\s+/g, ''))
       .replace(/\s+/g, ' ')
       .trim()
       .replace(/[;,:\-]+$/, '');
@@ -116,7 +122,8 @@
   }
 
   function pickRandom(list, count, skipWord) {
-    const source = list.filter((w) => w.word !== skipWord.word);
+    const skip = skipWord?.word;
+    const source = list.filter((w) => w.word !== skip);
     const out = [];
     while (source.length && out.length < count) {
       const idx = Math.floor(Math.random() * source.length);
@@ -155,7 +162,12 @@
     const localWrong = pickRandom(state.pool, 3, state.current);
     const fallbackWrong =
       localWrong.length < 3 ? pickRandom(partPools.get(state.part) || [], 3 - localWrong.length, state.current) : [];
-    const options = shuffle([state.current, ...localWrong, ...fallbackWrong]);
+    let options = shuffle([state.current, ...localWrong, ...fallbackWrong]);
+    if (options.length < 4) {
+      const used = new Set(options.map((o) => o.word));
+      const extra = words.filter((w) => w.word !== state.current.word && !used.has(w.word));
+      options = shuffle([...options, ...pickRandom(extra, 4 - options.length)]);
+    }
 
     examEl.innerHTML = `
       <div class="row">
@@ -183,7 +195,7 @@
           state.remaining = state.remaining.filter((w) => w.word !== state.current.word);
           state.answered += 1;
           buttons.forEach((b) => (b.disabled = true));
-          setTimeout(askNext, 650);
+          setTimeout(askNext, NEXT_QUESTION_DELAY_MS);
           return;
         }
 
