@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WordSmart Exam Trainer</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>WordSmart Exam Trainer</h1>
+          <p class="subtitle">Learn every word, letter by letter.</p>
+        </div>
+        <button id="themeToggle" class="toggle" type="button" aria-label="Toggle dark mode">🌙 Dark</button>
+      </header>
+
+      <section id="partSelection" class="card"></section>
+      <section id="letterSelection" class="card hidden"></section>
+      <section id="examScreen" class="card hidden"></section>
+    </main>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>
