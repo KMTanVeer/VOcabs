@@ -3,6 +3,7 @@
   const NEXT_QUESTION_DELAY_MS = 650;
   // Matches OCR-fragmented tokens broken into many short chunks (e.g., "de vi a tion").
   // 1-3 char chunks repeated 3+ times followed by a final 1-8 char chunk.
+  // Example: "some thing" is not matched, but "de vi a tion" is matched and re-joined.
   const OCR_SPLIT_WORD_PATTERN = /\b([a-z]{1,3}(?:\s+[a-z]{1,3}){2,}\s+[a-z]{1,8})\b/gi;
   const data = await fetch('./words-data.json').then((r) => r.json());
 
@@ -141,6 +142,19 @@
     return clone;
   }
 
+  function fillUniqueOptions(options, target, correctWord) {
+    const used = new Set(options.map((o) => o.word));
+    let tries = 0;
+    while (options.length < target && tries < words.length * 2) {
+      const candidate = words[Math.floor(Math.random() * words.length)];
+      tries += 1;
+      if (!candidate || candidate.word === correctWord || used.has(candidate.word)) continue;
+      used.add(candidate.word);
+      options.push(candidate);
+    }
+    return options;
+  }
+
   function askNext() {
     if (!state.remaining.length) {
       examEl.innerHTML = `
@@ -163,11 +177,7 @@
     const fallbackWrong =
       localWrong.length < 3 ? pickRandom(partPools.get(state.part) || [], 3 - localWrong.length, state.current) : [];
     let options = shuffle([state.current, ...localWrong, ...fallbackWrong]);
-    if (options.length < 4) {
-      const used = new Set(options.map((o) => o.word));
-      const extra = words.filter((w) => w.word !== state.current.word && !used.has(w.word));
-      options = shuffle([...options, ...pickRandom(extra, 4 - options.length)]);
-    }
+    if (options.length < 4) options = shuffle(fillUniqueOptions(options, 4, state.current.word));
 
     examEl.innerHTML = `
       <div class="row">
