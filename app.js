@@ -10,6 +10,7 @@
     String(text)
       .replace(/\u00ad/g, '')
       .replace(/ﬁ/g, 'fi')
+      .replace(/\b([a-z]{1,3}(?:\s+[a-z]{1,3}){2,}\s+[a-z]{1,8})\b/gi, (m) => m.replace(/\s+/g, ''))
       .replace(/\s+/g, ' ')
       .trim()
       .replace(/[;,:\-]+$/, '');
@@ -24,6 +25,11 @@
     current: null,
     answered: 0
   };
+
+  const partPools = new Map([
+    [1, words.filter((w) => w.part === 1)],
+    [2, words.filter((w) => w.part === 2)]
+  ]);
 
   const setTheme = (mode) => {
     document.documentElement.setAttribute('data-theme', mode);
@@ -147,7 +153,8 @@
     state.current = state.remaining[idx];
 
     const localWrong = pickRandom(state.pool, 3, state.current);
-    const fallbackWrong = localWrong.length < 3 ? pickRandom(words.filter((w) => w.part === state.part), 3 - localWrong.length, state.current) : [];
+    const fallbackWrong =
+      localWrong.length < 3 ? pickRandom(partPools.get(state.part) || [], 3 - localWrong.length, state.current) : [];
     const options = shuffle([state.current, ...localWrong, ...fallbackWrong]);
 
     examEl.innerHTML = `
