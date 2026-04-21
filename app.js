@@ -1,6 +1,7 @@
 (async function init() {
   // Delay keeps feedback visible briefly before automatically loading the next word.
   const NEXT_QUESTION_DELAY_MS = 650;
+  const MAX_VISIBLE_MISSED_WORDS = 15;
   // Matches OCR-fragmented tokens broken into many short chunks (e.g., "de vi a tion").
   // 1-3 char chunks repeated 3+ times followed by a final 1-8 char chunk.
   // Example: "some thing" is not matched, but "de vi a tion" is matched and re-joined.
@@ -29,7 +30,7 @@
       .replace(/\s*\.\.\.\s*/g, ' ')
       .replace(/\s+/g, ' ')
       .replace(/\s+([,.;:!?])/g, '$1')
-      .replace(/([;,])(?=[A-Za-z0-9(\[])/g, '$1 ')
+      .replace(/([;,])(?=[A-Za-z0-9\[(])/g, '$1 ')
       .replace(/:(?=[A-Za-z])/g, ': ')
       .trim();
     if (!value) return DEFINITION_FALLBACK;
@@ -199,13 +200,16 @@
     }
 
     const missedList = [...state.missedWords.values()];
-    const visibleMissedWords = missedList.slice(0, 15).map((w) => w.word).join(', ');
-    const hiddenMissedWords = Math.max(0, missedList.length - 15);
+    const visibleMissedWords = missedList.slice(0, MAX_VISIBLE_MISSED_WORDS).map((w) => w.word).join(', ');
+    const hiddenMissedWords = Math.max(0, missedList.length - MAX_VISIBLE_MISSED_WORDS);
+    const missedWordsSummary = missedList.length
+      ? `<p class="muted">Missed words: ${visibleMissedWords}${hiddenMissedWords ? `, +${hiddenMissedWords} more` : ''}</p>`
+      : '';
     examEl.innerHTML = `
       <h2>Completed 🎉</h2>
       <p>You completed all ${state.pool.length} words for letter <strong>${state.letter}</strong> in Word Smart 1.</p>
       <p>Words missed at least once: <strong>${missedList.length}</strong></p>
-      ${missedList.length ? `<p class="muted">Missed words: ${visibleMissedWords}${hiddenMissedWords ? `, +${hiddenMissedWords} more` : ''}</p>` : ''}
+      ${missedWordsSummary}
       <div class="row">
         <button id="restartLetter" class="primary">Retry Letter</button>
         <button id="practiceMissed" ${missedList.length ? '' : 'disabled'}>Practice Missed Words</button>
