@@ -5,6 +5,7 @@
   // 1-3 char chunks repeated 3+ times followed by a final 1-8 char chunk.
   // Example: "some thing" is not matched, but "de vi a tion" is matched and re-joined.
   const OCR_SPLIT_WORD_PATTERN = /\b([a-z]{1,3}(?:\s+[a-z]{1,3}){2,}\s+[a-z]{1,8})\b/gi;
+  const DEFINITION_FALLBACK = 'Definition unavailable.';
   const data = await fetch('./words-data.json').then((r) => r.json());
 
   const partEl = document.getElementById('partSelection');
@@ -22,10 +23,26 @@
       .trim()
       .replace(/[;,:\-]+$/, '');
 
-  const words = data.map((w) => ({ ...w, definition: clean(w.definition), word: clean(w.word) }));
+  const formatDefinition = (text) => {
+    if (!String(text || '').trim()) return DEFINITION_FALLBACK;
+    const value = clean(text)
+      .replace(/\s*\.\.\.\s*/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/\s+([,.;:!?])/g, '$1')
+      .trim();
+    if (!value) return DEFINITION_FALLBACK;
+    const withCapital = value.charAt(0).toUpperCase() + value.slice(1);
+    return /[.?!]$/.test(withCapital) ? withCapital : `${withCapital}.`;
+  };
+
+  const words = data.map((w) => ({
+    ...w,
+    definition: clean(w.definition),
+    definitionDisplay: formatDefinition(w.definition),
+    word: clean(w.word)
+  }));
 
   const state = {
-    part: null,
     letter: null,
     pool: [],
     remaining: [],
@@ -33,10 +50,10 @@
     answered: 0
   };
 
-  const partPools = new Map([
-    [1, words.filter((w) => w.part === 1)],
-    [2, words.filter((w) => w.part === 2)]
-  ]);
+  const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  const wordsByLetter = new Map(
+    ALPHABET.map((letter) => [letter, words.filter((w) => w.letter === letter)])
+  );
 
   const setTheme = (mode) => {
     document.documentElement.setAttribute('data-theme', mode);
@@ -49,31 +66,17 @@
     setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
   });
 
-  const lettersForPart = (part) => {
-    const grouped = new Map();
-    words.filter((w) => w.part === part).forEach((w) => grouped.set(w.letter, (grouped.get(w.letter) || 0) + 1));
-    return [...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  };
-
-  function showParts() {
+  function showHome() {
     partEl.classList.remove('hidden');
+    partEl.innerHTML = `
+      <h2>Word Smart 1 • Complete A–Z</h2>
+      <p class="muted">Premium vocabulary practice with all available Word Smart 1 entries.</p>
+      <p>Total words loaded: <strong>${words.length}</strong></p>
+      <button id="openLetters" class="primary">Choose Letter</button>
+    `;
     letterEl.classList.add('hidden');
     examEl.classList.add('hidden');
-    partEl.innerHTML = `
-      <h2>Choose Part</h2>
-      <p class="muted">Pick the source set before selecting a letter.</p>
-      <div class="grid">
-        <button data-part="1">Word Smart 1</button>
-        <button data-part="2">Word Smart 2</button>
-      </div>
-    `;
-
-    partEl.querySelectorAll('button[data-part]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        state.part = Number(btn.dataset.part);
-        showLetters();
-      });
-    });
+    document.getElementById('openLetters').addEventListener('click', showLetters);
   }
 
   function showLetters() {
@@ -81,20 +84,23 @@
     letterEl.classList.remove('hidden');
     examEl.classList.add('hidden');
 
-    const letters = lettersForPart(state.part);
     letterEl.innerHTML = `
       <div class="row">
-        <h2>Word Smart ${state.part}: Select a Letter</h2>
-        <button id="backToParts">Back</button>
+        <h2>Word Smart 1: Select a Letter</h2>
+        <button id="backToHome">Back</button>
       </div>
       <div class="grid">
-        ${letters
-          .map(([letter, total]) => `<button data-letter="${letter}">${letter}<br><span class="muted">${total} words</span></button>`)
+        ${ALPHABET
+          .map((letter) => {
+            const total = (wordsByLetter.get(letter) || []).length;
+            const disabled = total === 0 ? 'disabled' : '';
+            return `<button data-letter="${letter}" ${disabled}>${letter}<br><span class="muted">${total} words</span></button>`;
+          })
           .join('')}
       </div>
     `;
 
-    document.getElementById('backToParts').addEventListener('click', showParts);
+    document.getElementById('backToHome').addEventListener('click', showHome);
     letterEl.querySelectorAll('button[data-letter]').forEach((btn) => {
       btn.addEventListener('click', () => showStart(btn.dataset.letter));
     });
@@ -102,7 +108,7 @@
 
   function showStart(letter) {
     state.letter = letter;
-    state.pool = words.filter((w) => w.part === state.part && w.letter === letter);
+    state.pool = wordsByLetter.get(letter) || [];
     state.remaining = [...state.pool];
     state.answered = 0;
 
@@ -111,7 +117,7 @@
 
     examEl.innerHTML = `
       <div class="row">
-        <h2>Letter ${letter} • Word Smart ${state.part}</h2>
+        <h2>Letter ${letter} • Word Smart 1</h2>
         <button id="backToLetters">Change Letter</button>
       </div>
       <p>Total words: <strong>${state.pool.length}</strong></p>
@@ -159,7 +165,7 @@
     if (!state.remaining.length) {
       examEl.innerHTML = `
         <h2>Completed 🎉</h2>
-        <p>You completed all ${state.pool.length} words for letter <strong>${state.letter}</strong> in Word Smart ${state.part}.</p>
+        <p>You completed all ${state.pool.length} words for letter <strong>${state.letter}</strong> in Word Smart 1.</p>
         <div class="row">
           <button id="restartLetter" class="primary">Retry Letter</button>
           <button id="changeLetter">Choose Another Letter</button>
@@ -174,20 +180,19 @@
     state.current = state.remaining[idx];
 
     const localWrong = pickRandom(state.pool, 3, state.current);
-    const fallbackWrong =
-      localWrong.length < 3 ? pickRandom(partPools.get(state.part) || [], 3 - localWrong.length, state.current) : [];
+    const fallbackWrong = localWrong.length < 3 ? pickRandom(words, 3 - localWrong.length, state.current) : [];
     let options = shuffle([state.current, ...localWrong, ...fallbackWrong]);
     if (options.length < 4) options = shuffle(fillUniqueOptions(options, 4, state.current.word));
 
     examEl.innerHTML = `
       <div class="row">
-        <h2>Exam • Letter ${state.letter} • Word Smart ${state.part}</h2>
+        <h2>Exam • Letter ${state.letter} • Word Smart 1</h2>
         <p><strong>${state.answered + 1}</strong> / ${state.pool.length}</p>
       </div>
       <p class="word">${state.current.word}</p>
       <p class="muted">Choose the correct meaning:</p>
       <div class="options">
-        ${options.map((o, i) => `<button class="option" data-index="${i}">${o.definition}</button>`).join('')}
+        ${options.map((o, i) => `<button class="option" data-index="${i}">${o.definitionDisplay}</button>`).join('')}
       </div>
       <p id="feedback" class="feedback"></p>
     `;
@@ -216,5 +221,5 @@
     });
   }
 
-  showParts();
+  showHome();
 })();
