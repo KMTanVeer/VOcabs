@@ -29,7 +29,7 @@
       .replace(/\s*\.\.\.\s*/g, ' ')
       .replace(/\s+/g, ' ')
       .replace(/\s+([,.;:!?])/g, '$1')
-      .replace(/([;,])(?=\S)/g, '$1 ')
+      .replace(/([;,])(?=[A-Za-z0-9(\[])/g, '$1 ')
       .replace(/:(?=[A-Za-z])/g, ': ')
       .trim();
     if (!value) return DEFINITION_FALLBACK;
@@ -199,11 +199,13 @@
     }
 
     const missedList = [...state.missedWords.values()];
+    const visibleMissedWords = missedList.slice(0, 15).map((w) => w.word).join(', ');
+    const hiddenMissedWords = Math.max(0, missedList.length - 15);
     examEl.innerHTML = `
       <h2>Completed 🎉</h2>
       <p>You completed all ${state.pool.length} words for letter <strong>${state.letter}</strong> in Word Smart 1.</p>
       <p>Words missed at least once: <strong>${missedList.length}</strong></p>
-      ${missedList.length ? `<p class="muted">Missed words: ${missedList.map((w) => w.word).join(', ')}</p>` : ''}
+      ${missedList.length ? `<p class="muted">Missed words: ${visibleMissedWords}${hiddenMissedWords ? `, +${hiddenMissedWords} more` : ''}</p>` : ''}
       <div class="row">
         <button id="restartLetter" class="primary">Retry Letter</button>
         <button id="practiceMissed" ${missedList.length ? '' : 'disabled'}>Practice Missed Words</button>
