@@ -29,7 +29,8 @@
       .replace(/\s*\.\.\.\s*/g, ' ')
       .replace(/\s+/g, ' ')
       .replace(/\s+([,.;:!?])/g, '$1')
-      .replace(/([,;:])(?=\S)/g, '$1 ')
+      .replace(/([;,])(?=\S)/g, '$1 ')
+      .replace(/:(?=[A-Za-z])/g, ': ')
       .trim();
     if (!value) return DEFINITION_FALLBACK;
     const withCapital = value.charAt(0).toUpperCase() + value.slice(1);
@@ -190,7 +191,6 @@
         </div>
       `;
       document.getElementById('practiceMissedAgain')?.addEventListener('click', () => {
-        if (!state.missedWords.size) return;
         startRound([...state.missedWords.values()], true);
       });
       document.getElementById('restartLetter').addEventListener('click', () => showStart(state.letter));
@@ -212,7 +212,6 @@
     `;
     document.getElementById('restartLetter').addEventListener('click', () => showStart(state.letter));
     document.getElementById('practiceMissed').addEventListener('click', () => {
-      if (!state.missedWords.size) return;
       startRound(missedList, true);
     });
     document.getElementById('changeLetter').addEventListener('click', showLetters);
