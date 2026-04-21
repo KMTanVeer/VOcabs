@@ -24,6 +24,7 @@
       .replace(/[;,:\-]+$/, '');
 
   const formatDefinition = (text) => {
+    if (!String(text || '').trim()) return DEFINITION_FALLBACK;
     const value = clean(text)
       .replace(/\s*\.\.\.\s*/g, ' ')
       .replace(/\s+/g, ' ')
@@ -36,7 +37,6 @@
 
   const words = data.map((w) => ({
     ...w,
-    part: 1,
     definition: clean(w.definition),
     definitionDisplay: formatDefinition(w.definition),
     word: clean(w.word)
