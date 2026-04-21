@@ -29,6 +29,7 @@
       .replace(/\s*\.\.\.\s*/g, ' ')
       .replace(/\s+/g, ' ')
       .replace(/\s+([,.;:!?])/g, '$1')
+      .replace(/([,;:])(?=\S)/g, '$1 ')
       .trim();
     if (!value) return DEFINITION_FALLBACK;
     const withCapital = value.charAt(0).toUpperCase() + value.slice(1);
@@ -47,7 +48,10 @@
     pool: [],
     remaining: [],
     current: null,
-    answered: 0
+    answered: 0,
+    roundTotal: 0,
+    practicingMissed: false,
+    missedWords: new Map()
   };
 
   const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -111,6 +115,9 @@
     state.pool = wordsByLetter.get(letter) || [];
     state.remaining = [...state.pool];
     state.answered = 0;
+    state.roundTotal = state.pool.length;
+    state.practicingMissed = false;
+    state.missedWords = new Map();
 
     letterEl.classList.add('hidden');
     examEl.classList.remove('hidden');
@@ -161,18 +168,59 @@
     return options;
   }
 
-  function askNext() {
-    if (!state.remaining.length) {
+  function startRound(roundWords, practicingMissed = false) {
+    state.remaining = [...roundWords];
+    state.answered = 0;
+    state.roundTotal = roundWords.length;
+    state.practicingMissed = practicingMissed;
+    askNext();
+  }
+
+  function renderCompletion() {
+    if (state.practicingMissed) {
+      const leftToPractice = state.missedWords.size;
       examEl.innerHTML = `
-        <h2>Completed 🎉</h2>
-        <p>You completed all ${state.pool.length} words for letter <strong>${state.letter}</strong> in Word Smart 1.</p>
+        <h2>Practice Complete ✅</h2>
+        <p>You completed your missed-word practice for letter <strong>${state.letter}</strong>.</p>
+        <p>Words still flagged for later practice: <strong>${leftToPractice}</strong></p>
         <div class="row">
-          <button id="restartLetter" class="primary">Retry Letter</button>
+          <button id="practiceMissedAgain" class="primary" ${leftToPractice ? '' : 'disabled'}>Practice Missed Again</button>
+          <button id="restartLetter">Retry Full Letter</button>
           <button id="changeLetter">Choose Another Letter</button>
         </div>
       `;
+      document.getElementById('practiceMissedAgain')?.addEventListener('click', () => {
+        if (!state.missedWords.size) return;
+        startRound([...state.missedWords.values()], true);
+      });
       document.getElementById('restartLetter').addEventListener('click', () => showStart(state.letter));
       document.getElementById('changeLetter').addEventListener('click', showLetters);
+      return;
+    }
+
+    const missedList = [...state.missedWords.values()];
+    examEl.innerHTML = `
+      <h2>Completed 🎉</h2>
+      <p>You completed all ${state.pool.length} words for letter <strong>${state.letter}</strong> in Word Smart 1.</p>
+      <p>Words missed at least once: <strong>${missedList.length}</strong></p>
+      ${missedList.length ? `<p class="muted">Missed words: ${missedList.map((w) => w.word).join(', ')}</p>` : ''}
+      <div class="row">
+        <button id="restartLetter" class="primary">Retry Letter</button>
+        <button id="practiceMissed" ${missedList.length ? '' : 'disabled'}>Practice Missed Words</button>
+        <button id="changeLetter">Choose Another Letter</button>
+      </div>
+    `;
+    document.getElementById('restartLetter').addEventListener('click', () => showStart(state.letter));
+    document.getElementById('practiceMissed').addEventListener('click', () => {
+      if (!state.missedWords.size) return;
+      startRound(missedList, true);
+    });
+    document.getElementById('changeLetter').addEventListener('click', showLetters);
+  }
+
+  function askNext() {
+    if (!state.remaining.length) {
+      renderCompletion();
       return;
     }
 
@@ -186,8 +234,8 @@
 
     examEl.innerHTML = `
       <div class="row">
-        <h2>Exam • Letter ${state.letter} • Word Smart 1</h2>
-        <p><strong>${state.answered + 1}</strong> / ${state.pool.length}</p>
+        <h2>${state.practicingMissed ? 'Practice Missed •' : 'Exam •'} Letter ${state.letter} • Word Smart 1</h2>
+        <p><strong>${state.answered + 1}</strong> / ${state.roundTotal}</p>
       </div>
       <p class="word">${state.current.word}</p>
       <p class="muted">Choose the correct meaning:</p>
@@ -209,11 +257,13 @@
           feedback.className = 'feedback ok';
           state.remaining = state.remaining.filter((w) => w.word !== state.current.word);
           state.answered += 1;
+          if (state.practicingMissed) state.missedWords.delete(state.current.word);
           buttons.forEach((b) => (b.disabled = true));
           setTimeout(askNext, NEXT_QUESTION_DELAY_MS);
           return;
         }
 
+        state.missedWords.set(state.current.word, state.current);
         btn.classList.add('wrong');
         feedback.textContent = 'Try again.';
         feedback.className = 'feedback error';
