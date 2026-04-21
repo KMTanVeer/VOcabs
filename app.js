@@ -5,6 +5,7 @@
   // 1-3 char chunks repeated 3+ times followed by a final 1-8 char chunk.
   // Example: "some thing" is not matched, but "de vi a tion" is matched and re-joined.
   const OCR_SPLIT_WORD_PATTERN = /\b([a-z]{1,3}(?:\s+[a-z]{1,3}){2,}\s+[a-z]{1,8})\b/gi;
+  const DEFINITION_FALLBACK = 'Definition unavailable.';
   const data = await fetch('./words-data.json').then((r) => r.json());
 
   const partEl = document.getElementById('partSelection');
@@ -28,7 +29,7 @@
       .replace(/\s+/g, ' ')
       .replace(/\s+([,.;:!?])/g, '$1')
       .trim();
-    if (!value) return 'Definition unavailable.';
+    if (!value) return DEFINITION_FALLBACK;
     const withCapital = value.charAt(0).toUpperCase() + value.slice(1);
     return /[.?!]$/.test(withCapital) ? withCapital : `${withCapital}.`;
   };
